@@ -15,6 +15,7 @@
 
 ![Java 21](https://img.shields.io/badge/Java-21-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)
 ![JavaFX 21](https://img.shields.io/badge/JavaFX-21-007396?style=for-the-badge&logo=java&logoColor=white)
+![Release](https://img.shields.io/github/v/release/texatii01/rasterglyph?style=for-the-badge&color=00FFE6&logo=github)
 ![Tests Passing](https://img.shields.io/badge/Tests-78%2F78%20PASSING-00FFE6?style=for-the-badge&logo=checkmarx&logoColor=black)
 ![License MIT](https://img.shields.io/badge/License-MIT-9D8CFF?style=for-the-badge)
 ![Platform](https://img.shields.io/badge/Platform-macOS%20|%20Linux%20|%20Windows-white?style=for-the-badge)
@@ -110,7 +111,20 @@ com.rasterglyph
 
 ---
 
-## Quick Start
+## Download & Installation
+
+Pre-packaged native installers bundle their own lightweight Java runtime—**no Java installation required**:
+
+| Platform | Package | Format | Description |
+| :--- | :--- | :--- | :--- |
+| **macOS** | [**`RasterGlyph-1.0.0.dmg`**](https://github.com/texatii01/rasterglyph/releases/latest) | Apple Disk Image (`.dmg`) | Drag-and-drop to `/Applications`. Runs natively on Apple Silicon & Intel. |
+| **Windows** | [**`RasterGlyph-1.0.0.msi`**](https://github.com/texatii01/rasterglyph/releases/latest) | Windows Installer (`.msi`) | Setup wizard; adds Start Menu and Desktop shortcuts. |
+| **Linux** | [**`rasterglyph_1.0.0_amd64.deb`**](https://github.com/texatii01/rasterglyph/releases/latest) | Debian / Ubuntu Package (`.deb`) | Install via `sudo dpkg -i rasterglyph_1.0.0_amd64.deb`. |
+| **Universal** | [**`rasterglyph-1.0.0-all.jar`**](https://github.com/texatii01/rasterglyph/releases/latest) | Standalone Executable JAR | Run anywhere via `java -jar rasterglyph-1.0.0-all.jar` (Java 21+). |
+
+---
+
+## Building from Source (Developers)
 
 ### Prerequisites
 - **JDK 21** or later (LTS recommended)
@@ -119,7 +133,7 @@ com.rasterglyph
 ### Running the Desktop App
 ```bash
 # Clone the repository
-git clone https://github.com/<your-username>/rasterglyph.git
+git clone https://github.com/texatii01/rasterglyph.git
 cd rasterglyph
 
 # Launch via Gradle
