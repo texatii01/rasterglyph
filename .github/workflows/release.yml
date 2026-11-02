@@ -1,0 +1,141 @@
+name: Release Pipeline
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  # 1. Build Universal Runnable Fat JAR
+  build-jar:
+    name: Build Universal JAR
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Make Gradle Wrapper Executable
+        run: chmod +x gradlew
+
+      - name: Extract Clean Semantic Version from Tag
+        run: |
+          RAW_TAG="${GITHUB_REF_NAME}"
+          CLEAN_VERSION="${RAW_TAG#v}"
+          echo "APP_VERSION=${CLEAN_VERSION}" >> $GITHUB_ENV
+
+      - name: Build Fat JAR
+        run: ./gradlew fatJar -Pversion=${{ env.APP_VERSION }}
+
+      - name: Upload Fat JAR to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: build/libs/*-all.jar
+
+  # 2. Build Native Installers (macOS DMG, Windows MSI, Linux DEB)
+  build-native:
+    name: Build Native Package (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+            package-type: dmg
+          - os: windows-latest
+            package-type: msi
+          - os: ubuntu-latest
+            package-type: deb
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Make Gradle Wrapper Executable (Unix)
+        if: runner.os != 'Windows'
+        run: chmod +x gradlew
+
+      - name: Extract Clean Semantic Version from Tag
+        shell: bash
+        run: |
+          RAW_TAG="${GITHUB_REF_NAME}"
+          CLEAN_VERSION="${RAW_TAG#v}"
+          echo "APP_VERSION=${CLEAN_VERSION}" >> $GITHUB_ENV
+
+      - name: Build Application Distribution (Unix)
+        if: runner.os != 'Windows'
+        run: ./gradlew installDist -Pversion=${{ env.APP_VERSION }}
+
+      - name: Build Application Distribution (Windows)
+        if: runner.os == 'Windows'
+        run: .\gradlew.bat installDist -Pversion=${{ env.APP_VERSION }}
+
+      - name: Install Linux Packaging Dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y fakeroot binutils
+
+      - name: Package with jpackage (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          jpackage \
+            --input build/install/rasterglyph/lib \
+            --name RasterGlyph \
+            --main-jar rasterglyph-${{ env.APP_VERSION }}.jar \
+            --main-class com.rasterglyph.Main \
+            --type dmg \
+            --app-version ${{ env.APP_VERSION }} \
+            --dest release-packages
+
+      - name: Package with jpackage (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          jpackage `
+            --input build/install/rasterglyph/lib `
+            --name RasterGlyph `
+            --main-jar rasterglyph-${{ env.APP_VERSION }}.jar `
+            --main-class com.rasterglyph.Main `
+            --type msi `
+            --app-version ${{ env.APP_VERSION }} `
+            --win-menu `
+            --win-shortcut `
+            --dest release-packages
+
+      - name: Package with jpackage (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          jpackage \
+            --input build/install/rasterglyph/lib \
+            --name rasterglyph \
+            --main-jar rasterglyph-${{ env.APP_VERSION }}.jar \
+            --main-class com.rasterglyph.Main \
+            --type deb \
+            --app-version ${{ env.APP_VERSION }} \
+            --linux-shortcut \
+            --dest release-packages
+
+      - name: Upload Native Installer to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release-packages/*
