@@ -36,7 +36,7 @@ jobs:
           echo "APP_VERSION=${CLEAN_VERSION}" >> $GITHUB_ENV
 
       - name: Build Fat JAR
-        run: ./gradlew fatJar -Pversion=${{ env.APP_VERSION }}
+        run: ./gradlew fatJar "-Pversion=${{ env.APP_VERSION }}"
 
       - name: Upload Fat JAR to Release
         uses: softprops/action-gh-release@v2
@@ -48,6 +48,7 @@ jobs:
     name: Build Native Package (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         include:
           - os: macos-latest
@@ -70,8 +71,8 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
-      - name: Make Gradle Wrapper Executable (Unix)
-        if: runner.os != 'Windows'
+      - name: Make Gradle Wrapper Executable
+        shell: bash
         run: chmod +x gradlew
 
       - name: Extract Clean Semantic Version from Tag
@@ -81,13 +82,9 @@ jobs:
           CLEAN_VERSION="${RAW_TAG#v}"
           echo "APP_VERSION=${CLEAN_VERSION}" >> $GITHUB_ENV
 
-      - name: Build Application Distribution (Unix)
-        if: runner.os != 'Windows'
-        run: ./gradlew installDist -Pversion=${{ env.APP_VERSION }}
-
-      - name: Build Application Distribution (Windows)
-        if: runner.os == 'Windows'
-        run: .\gradlew.bat installDist -Pversion=${{ env.APP_VERSION }}
+      - name: Build Application Distribution
+        shell: bash
+        run: ./gradlew installDist "-Pversion=${{ env.APP_VERSION }}"
 
       - name: Install Linux Packaging Dependencies
         if: runner.os == 'Linux'
@@ -97,6 +94,7 @@ jobs:
 
       - name: Package with jpackage (macOS)
         if: runner.os == 'macOS'
+        shell: bash
         run: |
           jpackage \
             --input build/install/rasterglyph/lib \
@@ -104,26 +102,27 @@ jobs:
             --main-jar rasterglyph-${{ env.APP_VERSION }}.jar \
             --main-class com.rasterglyph.Main \
             --type dmg \
-            --app-version ${{ env.APP_VERSION }} \
+            --app-version "${{ env.APP_VERSION }}" \
             --dest release-packages
 
       - name: Package with jpackage (Windows)
         if: runner.os == 'Windows'
-        shell: pwsh
+        shell: bash
         run: |
-          jpackage `
-            --input build/install/rasterglyph/lib `
-            --name RasterGlyph `
-            --main-jar rasterglyph-${{ env.APP_VERSION }}.jar `
-            --main-class com.rasterglyph.Main `
-            --type msi `
-            --app-version ${{ env.APP_VERSION }} `
-            --win-menu `
-            --win-shortcut `
+          jpackage \
+            --input build/install/rasterglyph/lib \
+            --name RasterGlyph \
+            --main-jar rasterglyph-${{ env.APP_VERSION }}.jar \
+            --main-class com.rasterglyph.Main \
+            --type msi \
+            --app-version "${{ env.APP_VERSION }}" \
+            --win-menu \
+            --win-shortcut \
             --dest release-packages
 
       - name: Package with jpackage (Linux)
         if: runner.os == 'Linux'
+        shell: bash
         run: |
           jpackage \
             --input build/install/rasterglyph/lib \
@@ -131,7 +130,7 @@ jobs:
             --main-jar rasterglyph-${{ env.APP_VERSION }}.jar \
             --main-class com.rasterglyph.Main \
             --type deb \
-            --app-version ${{ env.APP_VERSION }} \
+            --app-version "${{ env.APP_VERSION }}" \
             --linux-shortcut \
             --dest release-packages
 
