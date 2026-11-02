@@ -1,0 +1,253 @@
+/* ==========================================================================
+   RASTER//GLYPH — Retro Cyberpunk HUD Stylesheet
+   Inspired by Tactical Telemetry Displays and CRT Sci-Fi Consoles
+   ========================================================================== */
+
+.root {
+    -fx-font-family: 'Courier New', Courier, Consolas, monospace;
+    -fx-background-color: #0A0B10;
+    -fx-background: #0A0B10;
+    -fx-base: #0A0B10;
+    -fx-control-inner-background: #06070B;
+    -fx-text-fill: #E0E6F4;
+    -color-bg-base: #0A0B10;
+    -color-bg-panel: #11131C;
+    -color-bg-card: #161824;
+    -color-border-subtle: #202436;
+    -color-border-accent: #3A4260;
+    -color-neon-cyan: #00FFE6;
+    -color-neon-violet: #9D8CFF;
+    -color-neon-amber: #FFB000;
+    -color-neon-red: #FF3366;
+    -color-text-dim: #7B85A0;
+}
+
+/* --- Top Header & Telemetry Bar --- */
+.header-bar {
+    -fx-background-color: #0D0F17;
+    -fx-border-color: transparent transparent #202436 transparent;
+    -fx-border-width: 1px;
+    -fx-padding: 10px 16px;
+    -fx-alignment: CENTER_LEFT;
+}
+
+.logo-text {
+    -fx-font-weight: bold;
+    -fx-font-size: 15px;
+    -fx-text-fill: #00FFE6;
+    -fx-effect: dropshadow(gaussian, rgba(0, 255, 230, 0.35), 8, 0.2, 0, 0);
+}
+
+.status-badge {
+    -fx-background-color: #161824;
+    -fx-border-color: #202436;
+    -fx-border-width: 1px;
+    -fx-padding: 3px 8px;
+    -fx-font-size: 11px;
+    -fx-text-fill: #7B85A0;
+}
+
+.status-badge-active {
+    -fx-background-color: rgba(0, 255, 230, 0.1);
+    -fx-border-color: #00FFE6;
+    -fx-border-width: 1px;
+    -fx-padding: 3px 8px;
+    -fx-font-size: 11px;
+    -fx-text-fill: #00FFE6;
+}
+
+/* --- HUD Panel Containers (with technical corner feel) --- */
+.hud-panel {
+    -fx-background-color: #11131C;
+    -fx-border-color: #202436;
+    -fx-border-width: 1px;
+    -fx-padding: 14px;
+    -fx-spacing: 10px;
+}
+
+.hud-panel-title {
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #9D8CFF;
+    -fx-padding: 0 0 4px 0;
+    -fx-border-color: transparent transparent #202436 transparent;
+    -fx-border-width: 1px;
+}
+
+/* --- Sliders --- */
+.slider .track {
+    -fx-background-color: #1A1D2C;
+    -fx-pref-height: 4px;
+    -fx-background-radius: 0;
+    -fx-border-color: #262B40;
+    -fx-border-width: 1px;
+}
+
+.slider .thumb {
+    -fx-background-color: #00FFE6;
+    -fx-pref-width: 12px;
+    -fx-pref-height: 12px;
+    -fx-background-radius: 0; /* Square retro thumb */
+    -fx-effect: dropshadow(gaussian, rgba(0, 255, 230, 0.5), 6, 0.3, 0, 0);
+}
+
+.slider .thumb:hover {
+    -fx-background-color: #FFFFFF;
+}
+
+/* --- Cyber Buttons --- */
+.button {
+    -fx-background-color: #161824;
+    -fx-border-color: #2E354D;
+    -fx-border-width: 1px;
+    -fx-background-radius: 0;
+    -fx-border-radius: 0;
+    -fx-text-fill: #00FFE6;
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+    -fx-padding: 7px 8px;
+    -fx-alignment: CENTER;
+    -fx-cursor: hand;
+}
+
+.button:hover {
+    -fx-background-color: rgba(0, 255, 230, 0.15);
+    -fx-border-color: #00FFE6;
+    -fx-effect: dropshadow(gaussian, rgba(0, 255, 230, 0.4), 8, 0.2, 0, 0);
+}
+
+.button:pressed {
+    -fx-background-color: #00FFE6;
+    -fx-text-fill: #0A0B10;
+}
+
+.button-accent {
+    -fx-background-color: rgba(157, 140, 255, 0.15);
+    -fx-border-color: #9D8CFF;
+    -fx-text-fill: #9D8CFF;
+}
+
+.button-accent:hover {
+    -fx-background-color: #9D8CFF;
+    -fx-text-fill: #0A0B10;
+    -fx-effect: dropshadow(gaussian, rgba(157, 140, 255, 0.5), 8, 0.2, 0, 0);
+}
+
+/* --- ComboBox / ChoiceBox --- */
+.combo-box {
+    -fx-background-color: #161824;
+    -fx-border-color: #2E354D;
+    -fx-border-width: 1px;
+    -fx-background-radius: 0;
+}
+
+.combo-box .list-cell {
+    -fx-background-color: #161824;
+    -fx-text-fill: #00FFE6;
+    -fx-font-size: 11px;
+}
+
+.combo-box-popup .list-view {
+    -fx-background-color: #11131C;
+    -fx-border-color: #00FFE6;
+    -fx-border-width: 1px;
+}
+
+.combo-box-popup .list-cell:hover {
+    -fx-background-color: rgba(0, 255, 230, 0.2);
+}
+
+/* --- CheckBox (HUD Brackets) --- */
+.check-box {
+    -fx-text-fill: #A0AAC0;
+    -fx-font-size: 11px;
+    -fx-cursor: hand;
+}
+
+.check-box .box {
+    -fx-background-color: #161824;
+    -fx-border-color: #2E354D;
+    -fx-border-width: 1px;
+    -fx-background-radius: 0;
+    -fx-pref-width: 14px;
+    -fx-pref-height: 14px;
+}
+
+.check-box:selected .box {
+    -fx-background-color: rgba(0, 255, 230, 0.2);
+    -fx-border-color: #00FFE6;
+}
+
+.check-box:selected .mark {
+    -fx-background-color: #00FFE6;
+}
+
+/* --- Viewport & ScrollPane (CRT Screen Area) --- */
+.scroll-pane {
+    -fx-background-color: #06070B;
+    -fx-background: #06070B;
+    -fx-border-color: transparent;
+}
+
+.scroll-pane > .viewport {
+    -fx-background-color: #06070B;
+    -fx-background: #06070B;
+}
+
+.scroll-pane > .corner {
+    -fx-background-color: #06070B;
+}
+
+.crt-screen {
+    -fx-background-color: #06070B;
+    -fx-background: #06070B;
+    -fx-border-color: #1C2030;
+    -fx-border-width: 1px;
+}
+
+.crt-screen > .viewport {
+    -fx-background-color: #06070B;
+    -fx-background: #06070B;
+}
+
+.crt-container {
+    -fx-background-color: #06070B;
+    -fx-background: #06070B;
+}
+
+.crt-text-area {
+    -fx-font-family: 'Courier New', Courier, Consolas, monospace;
+    -fx-background-color: transparent;
+    -fx-text-fill: #E0E6F4;
+    -fx-highlight-fill: rgba(0, 255, 230, 0.3);
+    -fx-highlight-text-fill: #FFFFFF;
+}
+
+.crt-text-area .content {
+    -fx-background-color: #06070B;
+}
+
+/* --- ScrollBars --- */
+.scroll-bar {
+    -fx-background-color: #0A0B10;
+}
+
+.scroll-bar .thumb {
+    -fx-background-color: #24293D;
+    -fx-background-radius: 0;
+}
+
+.scroll-bar .thumb:hover {
+    -fx-background-color: #00FFE6;
+}
+
+/* --- Footer Metrics Bar --- */
+.footer-bar {
+    -fx-background-color: #0D0F17;
+    -fx-border-color: #202436 transparent transparent transparent;
+    -fx-border-width: 1px;
+    -fx-padding: 6px 16px;
+    -fx-alignment: CENTER_LEFT;
+    -fx-font-size: 10px;
+    -fx-text-fill: #555E75;
+}

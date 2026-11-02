@@ -1,0 +1,47 @@
+plugins {
+    id 'java'
+    id 'application'
+    id 'org.openjfx.javafxplugin' version '0.1.0'
+}
+
+group = 'com.rasterglyph'
+version = '1.0.0'
+
+repositories {
+    mavenCentral()
+}
+
+javafx {
+    version = '21.0.2'
+    modules = ['javafx.controls', 'javafx.graphics', 'javafx.swing']
+}
+
+application {
+    mainClass = 'com.rasterglyph.Main'
+}
+
+dependencies {
+    def osName = System.getProperty("os.name").toLowerCase()
+    def osArch = System.getProperty("os.arch").toLowerCase()
+    def classifier = "mac"
+    if (osName.contains("mac")) {
+        classifier = (osArch.contains("aarch64") || osArch.contains("arm")) ? "mac-aarch64" : "mac"
+    } else if (osName.contains("win")) {
+        classifier = "win"
+    } else {
+        classifier = "linux"
+    }
+
+    implementation "org.openjfx:javafx-base:21.0.2:${classifier}"
+    implementation "org.openjfx:javafx-graphics:21.0.2:${classifier}"
+    implementation "org.openjfx:javafx-controls:21.0.2:${classifier}"
+    implementation "org.openjfx:javafx-swing:21.0.2:${classifier}"
+
+    testImplementation platform('org.junit:junit-bom:5.10.2')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+test {
+    useJUnitPlatform()
+}
