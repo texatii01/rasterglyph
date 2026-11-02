@@ -1,4 +1,4 @@
-# RASTER // GLYPH
+# RasterGlyph
 
 ```
 ██████╗  █████╗ ███████╗████████╗███████╗██████╗  ██████╗ ██╗  ██╗   ██╗██████╗ ██╗  ██╗
@@ -11,8 +11,6 @@
 
 <div align="center">
 
-**[ TACTICAL RASTER-TO-GLYPH SYNTHESIS ENGINE v1.0 ]**
-
 ![Java 21](https://img.shields.io/badge/Java-21-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)
 ![JavaFX 21](https://img.shields.io/badge/JavaFX-21-007396?style=for-the-badge&logo=java&logoColor=white)
 ![Release](https://img.shields.io/github/v/release/texatii01/rasterglyph?style=for-the-badge&color=00FFE6&logo=github)
@@ -20,7 +18,7 @@
 ![License MIT](https://img.shields.io/badge/License-MIT-9D8CFF?style=for-the-badge)
 ![Platform](https://img.shields.io/badge/Platform-macOS%20|%20Linux%20|%20Windows-white?style=for-the-badge)
 
-*A high-performance, retro-cyberpunk desktop studio and headless engine for transforming bitmap images into high-density ASCII, ANSI true-color, vector SVG, and HTML telemetry art.*
+*An interactive desktop application and headless Java library for converting images to ASCII art, ANSI terminal output, SVG vectors, and standalone HTML.*
 
 </div>
 
@@ -28,54 +26,50 @@
 
 ## Overview
 
-**RASTER//GLYPH** bridges the gap between retro 1970s terminal telemetry displays and modern computer graphics pipelines. Built on **Java 21** and **JavaFX**, it offers instantaneous, real-time conversion with Floyd–Steinberg error diffusion dithering, Sobel cel-shaded edge overlays, multi-stop false-color gradients, and an interactive **Before / After Split-Screen Wipe**.
+RasterGlyph is an image-to-ASCII converter built with **Java 21** and **JavaFX**. It combines real-time image processing filters (Floyd–Steinberg error diffusion, Sobel convolution edge overlays, and false-color gradients) with an interactive desktop interface featuring a draggable before/after split wipe.
 
-Designed with a strict separation between a **100% headless, zero-dependency conversion engine** (`com.rasterglyph.core`) and an **ultra-responsive, hardware-accelerated Cyberpunk HUD desktop client** (`com.rasterglyph.ui`).
+The codebase is split into two cleanly separated layers:
+- **`com.rasterglyph.core`**: A headless conversion engine with zero GUI dependencies, suitable for command-line tools or server-side rendering.
+- **`com.rasterglyph.ui`**: A hardware-accelerated JavaFX desktop application with real-time viewport controls, zoom and pan, and custom palettes.
 
 ---
 
-## Key Features
+## Features
 
 ### Interactive Before / After Split Wipe
-- Real-time vertical split screen comparing the raw input image directly against the live ASCII rendering.
-- Drag the tactile glowing handle `[ ◄ ► ]` left and right to wipe across the viewport.
-- **Triple-Layer GPU Scissor Pipeline**: Mutates hardware scissor clipping masks in `<0.05ms`, maintaining rock-solid **120 FPS** responsiveness without re-evaluating or re-rasterizing text glyphs during drag.
+- Side-by-side comparison between the original bitmap and the rendered ASCII output.
+- A draggable center handle lets you scrub across the viewport to inspect character alignment and detail retention.
+- Uses JavaFX hardware scissor clipping (`Canvas.setClip()`) to slide the split boundary smoothly without re-evaluating or re-rasterizing glyphs during drag.
 
-### Ultra-High-Performance Architecture
-- **Resize-First Pipeline**: Downsamples high-resolution camera images (12MP–40MP) *before* pixel loops, dropping processing latency from 2,500ms down to **~10ms**.
-- **Direct Raster Array Operations**: Uses direct `DataBufferInt` 1D array operations, bypassing 2D coordinate lookups and bounds checks.
-- **Zero-Allocation Glyph Renderer**: Employs static ASCII glyph lookup tables and color state deduplication, eliminating tens of thousands of heap allocations per frame.
-- **Smooth 20ms Slider Debouncing**: Keeps slider thumbs completely liquid smooth at 60 FPS without event queue backlog.
+### Image Processing & Filter Pipeline
+- **Floyd–Steinberg Dithering**: 2D error diffusion spreads quantization errors to neighboring pixels, preventing banding across smooth gradients.
+- **Sobel Edge Detection**: Applies $3 \times 3$ horizontal and vertical convolution kernels to detect contours, then maps directional angles ($0^\circ, 45^\circ, 90^\circ, 135^\circ$) to character strokes (`-`, `/`, `|`, `\`).
+- **Edge Overlay Mode**: Injects structural edge strokes directly over shaded character fills to retain silhouette clarity.
+- **Aspect Ratio Correction**: Corrects for standard rectangular monospace font proportions (typically 1:2 width-to-height ratio) so output images do not stretch vertically.
 
-### Cursor-Anchored Viewport Zoom
-- Direct scroll-wheel zoom spanning **25% to 600%**.
-- Mathematically anchored: the exact pixel under your cursor remains pinned in place while zooming in or out.
-- Double-click anywhere on the canvas to immediately snap back to 100% view.
+### Color Modes & Palettes
+- **Source RGB**: Extracts 24-bit True-Color values per character directly from the source image.
+- **Color Gradients**: Multi-stop interpolated palettes including Cyberpunk Neon (cyan to purple), Phosphor Green (CRT style), Amber CRT, Thermal Heatmap, and Monochrome Grayscale.
 
-### Color Gradients & Palettes
-- **Original RGB**: 24-bit True-Color extraction directly from the source image.
-- **Cyberpunk Neon**: Electric cyan `#00FFE6` to phosphor violet `#9D8CFF`.
-- **Phosphor Green**: P1 monochrome terminal phosphor `#33FF33`.
-- **Amber CRT**: P3 warm monochrome amber `#FFB000`.
-- **Thermal Heatmap**: False-color infrared spectrum (Blue $\rightarrow$ Cyan $\rightarrow$ Yellow $\rightarrow$ Red).
-- **Matrix Green**: High-contrast phosphor green gradient.
-- **Monochrome Ink**: Clean grayscale terminal output.
+### Canvas Themes
+- **Dark CRT**: Dark slate background with subtle scanlines and neon highlights.
+- **White Paper**: Clean white background with dark charcoal text for print and document publishing.
+- **Vintage Parchment**: Warm textured paper with sepia ink tones.
 
-### Multi-Theme Canvas
-- **DARK CRT**: Void-black background (`#06070B`), neon accents, subtle CRT scanlines, and technical HUD corner brackets.
-- **WHITE PAPER**: Stark clean white paper (`#FFFFFF`) with dark charcoal ink (`#101116`) for print and editorial publishing.
-- **VINTAGE PARCHMENT**: Warm textured cream paper (`#F4EEDB`) with sepia ink (`#281B10`).
+### Export Formats
+- **PNG**: High-resolution raster image rendered using monospace font metrics.
+- **SVG**: Resolution-independent vector document with selectable text and grouped color spans.
+- **HTML**: Self-contained HTML file styled with monospace font, responsive layout, and optional CRT scanlines.
+- **Plain Text & ANSI**: Direct clipboard copy for plain text or terminal escape sequences with 24-bit color.
 
-### Advanced Filters & Edge Detection
-- **Floyd–Steinberg Error Diffusion**: Eliminates tonal banding across smooth gradients with uniform halftone stippling.
-- **Sobel Directional Line Art**: $3 \times 3$ convolution kernels compute gradient magnitude and map directional angles to character strokes (`|`, `-`, `/`, `\`).
-- **Cel-Shaded Hybrid Overlay**: Injects structural edge strokes directly over shaded ASCII character fills.
+---
 
-### Quad-Export Action Suite
-1. **`[ PNG IMAGE ]`**: High-resolution rasterization rendered with clean monospace font metrics.
-2. **`[ SVG VECTOR ]`**: Resolution-independent XML vector art with preserved character positions and embedded styles.
-3. **`[ HTML DOC ]`**: Standalone web document with responsive CSS, deduplicated color spans, and optional scanlines.
-4. **`[ COPY TEXT ]`**: Copies pure plain-text ASCII art directly to system clipboard.
+## Performance Considerations
+
+- **Resize-First Processing**: Source images are downscaled to the target character grid dimensions before running brightness, contrast, and dithering passes. This avoids running convolution loops across millions of unused raw pixels.
+- **Direct Raster Array Access**: Pixel manipulation operates directly on underlying 1D `DataBufferInt` arrays instead of using `BufferedImage.getRGB(x, y)` coordinate lookups.
+- **Debounced Controls**: Slider parameter changes are debounced (20ms) to avoid queue backlog on the JavaFX application thread during continuous user adjustments.
+- **Scissor-Based Wipe**: The before/after split wipe updates rectangular clipping bounds rather than triggering canvas redraws.
 
 ---
 
@@ -84,120 +78,111 @@ Designed with a strict separation between a **100% headless, zero-dependency con
 ```
 com.rasterglyph
 │
-├── core/                       # 100% Headless Conversion Engine (Zero GUI Dependencies)
-│   ├── CharacterSet.java       # Standard, Extended, Binary, and Block character palettes
-│   ├── CharacterMapper.java    # Uniform luminance-to-glyph mapping & inversion
-│   ├── AsciiResult.java        # Immutable character & RGB 2D grid bundle
-│   ├── ImageLoader.java        # Safe loading and extension validation for PNG, JPG, BMP
+├── core/                       # Headless Conversion Engine (Zero GUI Dependencies)
+│   ├── CharacterSet.java       # Predefined character ramps (Standard, Extended, Binary, Blocks)
+│   ├── CharacterMapper.java    # Luminance-to-glyph mapping and inversion logic
+│   ├── AsciiResult.java        # Immutable 2D grid containing characters and RGB values
+│   ├── ImageLoader.java        # Image loading with format and boundary checks
 │   ├── ImageResizer.java       # Aspect-ratio corrected bilinear downsampler
-│   ├── ImageProcessor.java     # Direct-raster luminance, contrast, brightness, & inversion
-│   ├── AsciiConverter.java     # Pipeline coordinator with direct & dithered pipelines
-│   ├── DitherFilter.java       # Floyd–Steinberg 2D error diffusion algorithm
-│   ├── SobelEdgeDetector.java  # 3x3 convolution edge detection & directional strokes
+│   ├── ImageProcessor.java     # Brightness, contrast, and inversion algorithms
+│   ├── AsciiConverter.java     # Pipeline coordinator tying together resizing and mapping
+│   ├── DitherFilter.java       # Floyd–Steinberg 2D error diffusion implementation
+│   ├── SobelEdgeDetector.java  # 3x3 convolution kernels and directional stroke mapping
 │   ├── ColorGradient.java      # Multi-stop linear RGB gradient interpolator
 │   ├── AnsiRenderer.java       # 24-bit ANSI terminal escape sequence renderer
 │   ├── ImageExporter.java      # Monospace font rasterizer to PNG
-│   ├── SvgExporter.java        # Resolution-independent vector SVG exporter
-│   └── HtmlExporter.java       # CRT styled standalone HTML exporter
+│   ├── SvgExporter.java        # Vector SVG exporter with color grouping
+│   └── HtmlExporter.java       # Self-contained HTML document exporter
 │
-└── ui/                         # JavaFX Cyberpunk HUD & Viewport Layer
-    ├── Main.java               # Standalone JVM launcher bypassing module-path checks
-    ├── RasterGlyphApp.java     # Primary HUD window, drag-and-drop, & telemetry header
-    ├── ControlDeck.java        # Tactical control sidebar with bracketed parameter badges
-    ├── AsciiViewport.java      # Triple-canvas hardware scissor viewport & 120 FPS split wipe
-    ├── FxImageUtils.java       # Fast AWT BufferedImage <-> JavaFX Image bridge
-    └── styles/retro-hud.css    # Void-black, neon cyan, and square-thumb stylesheet
+└── ui/                         # JavaFX Desktop Interface
+    ├── Main.java               # Application entry point
+    ├── RasterGlyphApp.java     # Primary application layout and drag-and-drop handling
+    ├── ControlDeck.java        # Sidebar controls for filters, characters, and palettes
+    ├── AsciiViewport.java      # Layered canvas viewport with split-wipe and zoom
+    ├── FxImageUtils.java       # BufferedImage to JavaFX Image converter
+    └── styles/retro-hud.css    # Dark monospace UI stylesheet
 ```
 
 ---
 
 ## Download & Installation
 
-Pre-packaged native installers bundle their own lightweight Java runtime—**no Java installation required**:
+Pre-packaged installers bundle a dedicated runtime—**no separate Java installation is required**:
 
 | Platform | Package | Format | Description |
 | :--- | :--- | :--- | :--- |
-| **macOS** | [**`RasterGlyph-1.0.0.dmg`**](https://github.com/texatii01/rasterglyph/releases/latest) | Apple Disk Image (`.dmg`) | Drag-and-drop to `/Applications`. Runs natively on Apple Silicon & Intel. |
-| **Windows** | [**`RasterGlyph-1.0.0.msi`**](https://github.com/texatii01/rasterglyph/releases/latest) | Windows Installer (`.msi`) | Setup wizard; adds Start Menu and Desktop shortcuts. |
+| **macOS** | [**`RasterGlyph-1.0.0.dmg`**](https://github.com/texatii01/rasterglyph/releases/latest) | Apple Disk Image (`.dmg`) | Drag-and-drop to `/Applications`. Runs on Apple Silicon and Intel. |
+| **Windows** | [**`RasterGlyph-1.0.0.msi`**](https://github.com/texatii01/rasterglyph/releases/latest) | Windows Installer (`.msi`) | Standard setup wizard; creates desktop and Start menu shortcuts. |
 | **Linux** | [**`rasterglyph_1.0.0_amd64.deb`**](https://github.com/texatii01/rasterglyph/releases/latest) | Debian / Ubuntu Package (`.deb`) | Install via `sudo dpkg -i rasterglyph_1.0.0_amd64.deb`. |
-| **Universal** | [**`rasterglyph-1.0.0-all.jar`**](https://github.com/texatii01/rasterglyph/releases/latest) | Standalone Executable JAR | Run anywhere via `java -jar rasterglyph-1.0.0-all.jar` (Java 21+). |
+| **Universal** | [**`rasterglyph-1.0.0-all.jar`**](https://github.com/texatii01/rasterglyph/releases/latest) | Executable JAR | Run via `java -jar rasterglyph-1.0.0-all.jar` (Java 21+ required). |
 
 ---
 
-## Building from Source (Developers)
+## Building from Source
 
 ### Prerequisites
-- **JDK 21** or later (LTS recommended)
+- **JDK 21** or later
 - **Gradle 8.5+** (or use the included `./gradlew`)
 
-### Running the Desktop App
+### Running Locally
 ```bash
-# Clone the repository
 git clone https://github.com/texatii01/rasterglyph.git
 cd rasterglyph
 
-# Launch via Gradle
 ./gradlew run
 ```
 
-*Alternatively, run `com.rasterglyph.Main` directly inside your favorite IDE (IntelliJ IDEA, Eclipse, VS Code).*
-
 ### Running Tests
-Execute the full automated unit test suite (78 tests covering all conversion filters, exporters, and resizers):
+Execute the automated test suite (78 unit tests covering image processing, dithering, and exporters):
 ```bash
 ./gradlew test
 ```
 
 ---
 
-## Headless API Usage
+## Library Usage (Headless)
 
-You can use `com.rasterglyph.core` as a standalone Java library without launching the GUI:
+`com.rasterglyph.core` can be imported and used independently in non-GUI applications:
 
 ```java
 import com.rasterglyph.core.*;
 import java.awt.image.BufferedImage;
 import java.io.File;
+import java.nio.file.Path;
 
 public class Example {
-    public static void main(String[] args) {
-        // 1. Load source image
+    public static void main(String[] args) throws Exception {
+        // 1. Load the input image
         BufferedImage image = ImageLoader.load(new File("photo.jpg"));
 
-        // 2. Configure converter with Floyd-Steinberg dithering
+        // 2. Configure the converter (extended character set, color enabled, Floyd-Steinberg dithering)
         CharacterMapper mapper = new CharacterMapper(CharacterSet.EXTENDED, false);
-        AsciiConverter converter = new AsciiConverter(mapper, 0.5, true, true);
+        AsciiConverter converter = new AsciiConverter(mapper, ImageResizer.DEFAULT_CHAR_ASPECT_RATIO, true, true);
 
-        // 3. Convert image to 120-column ASCII result
+        // 3. Convert to 120-column ASCII output
         AsciiResult result = converter.convert(image, 120);
 
-        // 4. Print 24-bit ANSI True-Color directly to terminal
+        // 4. Print ANSI True-Color output to the terminal
         System.out.println(AnsiRenderer.render(result));
 
-        // 5. Export to Vector SVG and standalone HTML
-        SvgExporter.export(result, new File("output.svg"));
-        HtmlExporter.export(result, new File("output.html"), true);
+        // 5. Export to SVG and HTML files
+        SvgExporter.exportToFile(result, Path.of("output.svg"));
+        HtmlExporter.exportToFile(result, Path.of("output.html"));
     }
 }
 ```
 
 ---
 
-## Telemetry Controls & Shortcuts
+## Controls & Shortcuts
 
-| Action | Control | Description |
+| Action | Input | Description |
 | :--- | :--- | :--- |
-| **Zoom In / Out** | `Scroll Wheel` | Zooms into the exact pixel under the mouse cursor ($25\% \dots 600\%$) |
-| **Reset Zoom** | `Double-Click` or click `[ ZOOM ]` | Resets zoom factor to $100\%$ and centers artwork |
-| **Pan Viewport** | `Click & Drag Canvas` | Pans canvas when artwork exceeds viewport bounds |
-| **Before / After Wipe** | `Click & Drag [ ◄ ► ]` | Slides split divider to compare raw image vs ASCII |
-| **Import Image** | `Drag & Drop` | Drop any PNG, JPG, or BMP file directly onto the window |
-
----
-
-## AI Assistance Disclosure
-
-This project was developed with the assistance of AI tools for code generation, architecture planning, performance optimization, and documentation, under human engineering direction and review.
+| **Zoom In / Out** | `Scroll Wheel` | Zooms toward cursor position ($25\% \dots 600\%$) |
+| **Reset Zoom** | `Double-Click` or click `[ ZOOM ]` | Resets zoom factor to $100\%$ and centers image |
+| **Pan Viewport** | `Click & Drag Canvas` | Pans the canvas when zoomed in |
+| **Before / After Wipe** | `Click & Drag [ ◄ ► ]` | Drags split divider between original image and ASCII |
+| **Import Image** | `Drag & Drop` | Drop any PNG, JPG, or BMP file onto the window |
 
 ---
 
