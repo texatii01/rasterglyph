@@ -9,8 +9,10 @@ import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.image.Image;
+import javafx.scene.input.MouseButton;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.input.ScrollEvent;
+import javafx.scene.input.ZoomEvent;
 import javafx.scene.layout.StackPane;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Rectangle;
@@ -19,6 +21,8 @@ import javafx.scene.text.FontWeight;
 import javafx.scene.text.TextAlignment;
 
 import java.awt.image.BufferedImage;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Ultra-high-performance, hardware-accelerated zoomable CRT / Paper Viewport.
@@ -37,12 +41,27 @@ public final class AsciiViewport extends StackPane {
 
     private static final double HANDLE_GRAB_WIDTH = 26.0;
 
+    // Hard ceiling on canvas layout dimension to prevent exceeding GPU texture limits (4096px physical texture on 2x Retina)
+    private static final double MAX_CANVAS_DIM = 2000.0;
+
     // Pre-allocated static string cache to eliminate tens of thousands of String allocations per frame
     private static final String[] ASCII_STRINGS = new String[256];
+    private static final Map<Character, String> UNICODE_GLYPH_CACHE = new ConcurrentHashMap<>();
+
     static {
         for (int i = 0; i < 256; i++) {
             ASCII_STRINGS[i] = String.valueOf((char) i);
         }
+        for (char c : new char[]{'█', '▓', '▒', '░'}) {
+            UNICODE_GLYPH_CACHE.put(c, String.valueOf(c));
+        }
+    }
+
+    private static String getGlyphString(char ch) {
+        if (ch < 256) {
+            return ASCII_STRINGS[ch];
+        }
+        return UNICODE_GLYPH_CACHE.computeIfAbsent(ch, String::valueOf);
     }
 
     private final ScrollPane scrollPane;
@@ -77,7 +96,9 @@ public final class AsciiViewport extends StackPane {
     private double currentPadding = 28;
     private double currentArtWidth = 744;
     private double currentArtHeight = 544;
+    private double currentEffectiveFontSize = 12.0;
 
+    private long lastScrollZoomTime = 0;
     private java.util.function.Consumer<Double> onZoomChangeListener;
 
     public AsciiViewport() {
@@ -105,19 +126,36 @@ public final class AsciiViewport extends StackPane {
         scrollPane.setFitToHeight(true);
         scrollPane.setStyle("-fx-background-color: #06070B; -fx-background: #06070B;");
 
-        // Cursor-anchored Zooming
+        // Cursor-anchored Zooming with throttling to prevent GPU command queue flooding
         scrollPane.addEventFilter(ScrollEvent.SCROLL, event -> {
             if (event.getDeltaY() != 0) {
-                double delta = event.getDeltaY() > 0 ? 0.15 : -0.15;
-                zoomAt(event.getSceneX(), event.getSceneY(), delta);
+                long now = System.currentTimeMillis();
+                if (now - lastScrollZoomTime >= 20) {
+                    double delta = event.getDeltaY() > 0 ? 0.12 : -0.12;
+                    zoomAt(event.getSceneX(), event.getSceneY(), delta);
+                    lastScrollZoomTime = now;
+                }
                 event.consume();
             }
         });
 
+        // Trackpad pinch-to-zoom support
+        scrollPane.addEventFilter(ZoomEvent.ZOOM, event -> {
+            double zoomDelta = (event.getZoomFactor() - 1.0) * 0.8;
+            if (Math.abs(zoomDelta) > 0.01) {
+                zoomAt(event.getSceneX(), event.getSceneY(), zoomDelta);
+            }
+            event.consume();
+        });
+
         // Double-click to reset zoom back to 100%
-        canvasContainer.setOnMouseClicked(event -> {
-            if (event.getClickCount() == 2) {
-                if (!splitViewEnabled || Math.abs(event.getX() - currentSplitX) > HANDLE_GRAB_WIDTH) {
+        scrollPane.setOnMouseClicked(event -> {
+            if (event.getClickCount() == 2 && event.getButton() == MouseButton.PRIMARY) {
+                Point2D pt = null;
+                try {
+                    pt = asciiCanvas.sceneToLocal(event.getSceneX(), event.getSceneY());
+                } catch (Exception ignored) {}
+                if (!splitViewEnabled || pt == null || Math.abs(pt.getX() - currentSplitX) > HANDLE_GRAB_WIDTH) {
                     resetZoom();
                 }
             }
@@ -194,16 +232,16 @@ public final class AsciiViewport extends StackPane {
     private void updateClipsAndOverlay() {
         if (!splitViewEnabled) return;
 
-        // Mutate GPU scissor clipping bounds
+        // Mutate GPU scissor clipping bounds safely
         sourceClip.setX(0);
         sourceClip.setY(0);
-        sourceClip.setWidth(currentSplitX);
-        sourceClip.setHeight(currentContentHeight);
+        sourceClip.setWidth(Math.max(0.0, currentSplitX));
+        sourceClip.setHeight(Math.max(0.0, currentContentHeight));
 
-        asciiClip.setX(currentSplitX);
+        asciiClip.setX(Math.max(0.0, currentSplitX));
         asciiClip.setY(0);
-        asciiClip.setWidth(Math.max(0, currentContentWidth - currentSplitX));
-        asciiClip.setHeight(currentContentHeight);
+        asciiClip.setWidth(Math.max(0.0, currentContentWidth - currentSplitX));
+        asciiClip.setHeight(Math.max(0.0, currentContentHeight));
 
         renderOverlayLayer();
     }
@@ -291,17 +329,45 @@ public final class AsciiViewport extends StackPane {
         if (currentResult == null) return;
 
         double oldZoom = zoomFactor;
-        double newZoom = Math.clamp(zoomFactor + deltaFactor, 0.25, 6.0);
+        double newZoom = Math.clamp(zoomFactor + deltaFactor, 0.25, 3.5);
         if (Math.abs(newZoom - oldZoom) < 0.001) return;
 
-        Point2D cursorInCanvas = asciiCanvas.sceneToLocal(pivotSceneX, pivotSceneY);
-        Point2D cursorInView = scrollPane.sceneToLocal(pivotSceneX, pivotSceneY);
+        Point2D cursorInCanvas = null;
+        try {
+            cursorInCanvas = asciiCanvas.sceneToLocal(pivotSceneX, pivotSceneY);
+        } catch (Exception ignored) {}
 
-        double anchorX = Math.clamp(cursorInCanvas.getX() / asciiCanvas.getWidth(), 0.0, 1.0);
-        double anchorY = Math.clamp(cursorInCanvas.getY() / asciiCanvas.getHeight(), 0.0, 1.0);
+        Point2D cursorInView = null;
+        try {
+            cursorInView = scrollPane.sceneToLocal(pivotSceneX, pivotSceneY);
+        } catch (Exception ignored) {}
 
-        double cursorViewX = cursorInView.getX();
-        double cursorViewY = cursorInView.getY();
+        double canvasW = Math.max(1.0, asciiCanvas.getWidth());
+        double canvasH = Math.max(1.0, asciiCanvas.getHeight());
+
+        double anchorX = 0.5;
+        double anchorY = 0.5;
+        if (cursorInCanvas != null) {
+            double rawAnchorX = cursorInCanvas.getX() / canvasW;
+            double rawAnchorY = cursorInCanvas.getY() / canvasH;
+            if (!Double.isNaN(rawAnchorX) && !Double.isInfinite(rawAnchorX)) {
+                anchorX = Math.clamp(rawAnchorX, 0.0, 1.0);
+            }
+            if (!Double.isNaN(rawAnchorY) && !Double.isInfinite(rawAnchorY)) {
+                anchorY = Math.clamp(rawAnchorY, 0.0, 1.0);
+            }
+        }
+
+        Bounds currentViewBounds = scrollPane.getViewportBounds();
+        double fallbackViewW = currentViewBounds != null && currentViewBounds.getWidth() > 0 ? currentViewBounds.getWidth() : 800.0;
+        double fallbackViewH = currentViewBounds != null && currentViewBounds.getHeight() > 0 ? currentViewBounds.getHeight() : 600.0;
+
+        double cursorViewX = (cursorInView != null && !Double.isNaN(cursorInView.getX()) && !Double.isInfinite(cursorInView.getX()))
+                ? cursorInView.getX()
+                : fallbackViewW * 0.5;
+        double cursorViewY = (cursorInView != null && !Double.isNaN(cursorInView.getY()) && !Double.isInfinite(cursorInView.getY()))
+                ? cursorInView.getY()
+                : fallbackViewH * 0.5;
 
         this.zoomFactor = newZoom;
         repaintAll();
@@ -312,36 +378,68 @@ public final class AsciiViewport extends StackPane {
         Bounds newViewBounds = scrollPane.getViewportBounds();
         Bounds newContentBounds = canvasContainer.getBoundsInLocal();
 
-        double viewW = newViewBounds.getWidth();
-        double viewH = newViewBounds.getHeight();
-        double contentW = newContentBounds.getWidth();
-        double contentH = newContentBounds.getHeight();
+        double viewW = (newViewBounds != null && newViewBounds.getWidth() > 0) ? newViewBounds.getWidth() : fallbackViewW;
+        double viewH = (newViewBounds != null && newViewBounds.getHeight() > 0) ? newViewBounds.getHeight() : fallbackViewH;
+        double contentW = (newContentBounds != null && newContentBounds.getWidth() > 0) ? newContentBounds.getWidth() : currentContentWidth;
+        double contentH = (newContentBounds != null && newContentBounds.getHeight() > 0) ? newContentBounds.getHeight() : currentContentHeight;
 
-        if (contentW > viewW) {
-            double targetPointX = asciiCanvas.getLayoutX() + (anchorX * asciiCanvas.getWidth());
+        // Horizontal scroll adjustment
+        double diffW = contentW - viewW;
+        if (diffW > 1.0) {
+            double targetPointX = asciiCanvas.getLayoutX() + (anchorX * canvasW);
             double targetOffset = targetPointX - cursorViewX;
-            double hval = targetOffset / (contentW - viewW);
-            scrollPane.setHvalue(Math.clamp(hval, 0.0, 1.0));
+            double hval = targetOffset / diffW;
+            if (!Double.isNaN(hval) && !Double.isInfinite(hval)) {
+                scrollPane.setHvalue(Math.clamp(hval, 0.0, 1.0));
+            } else {
+                scrollPane.setHvalue(0.5);
+            }
+        } else {
+            // When content fits inside the viewport, ALWAYS center it to avoid shifting off-screen
+            scrollPane.setHvalue(0.5);
         }
 
-        if (contentH > viewH) {
-            double targetPointY = asciiCanvas.getLayoutY() + (anchorY * asciiCanvas.getHeight());
+        // Vertical scroll adjustment
+        double diffH = contentH - viewH;
+        if (diffH > 1.0) {
+            double targetPointY = asciiCanvas.getLayoutY() + (anchorY * canvasH);
             double targetOffset = targetPointY - cursorViewY;
-            double vval = targetOffset / (contentH - viewH);
-            scrollPane.setVvalue(Math.clamp(vval, 0.0, 1.0));
+            double vval = targetOffset / diffH;
+            if (!Double.isNaN(vval) && !Double.isInfinite(vval)) {
+                scrollPane.setVvalue(Math.clamp(vval, 0.0, 1.0));
+            } else {
+                scrollPane.setVvalue(0.5);
+            }
+        } else {
+            // When content fits inside the viewport, ALWAYS center it to avoid shifting off-screen
+            scrollPane.setVvalue(0.5);
         }
 
         notifyZoomChange();
     }
 
     public void zoomIn() {
-        Bounds viewBounds = scrollPane.localToScene(scrollPane.getViewportBounds());
-        zoomAt(viewBounds.getCenterX(), viewBounds.getCenterY(), 0.15);
+        Bounds vp = scrollPane.getViewportBounds();
+        if (vp != null && vp.getWidth() > 0 && vp.getHeight() > 0) {
+            Bounds viewBounds = scrollPane.localToScene(vp);
+            if (viewBounds != null) {
+                zoomAt(viewBounds.getCenterX(), viewBounds.getCenterY(), 0.15);
+                return;
+            }
+        }
+        zoomAt(getWidth() * 0.5, getHeight() * 0.5, 0.15);
     }
 
     public void zoomOut() {
-        Bounds viewBounds = scrollPane.localToScene(scrollPane.getViewportBounds());
-        zoomAt(viewBounds.getCenterX(), viewBounds.getCenterY(), -0.15);
+        Bounds vp = scrollPane.getViewportBounds();
+        if (vp != null && vp.getWidth() > 0 && vp.getHeight() > 0) {
+            Bounds viewBounds = scrollPane.localToScene(vp);
+            if (viewBounds != null) {
+                zoomAt(viewBounds.getCenterX(), viewBounds.getCenterY(), -0.15);
+                return;
+            }
+        }
+        zoomAt(getWidth() * 0.5, getHeight() * 0.5, -0.15);
     }
 
     public void resetZoom() {
@@ -390,42 +488,63 @@ public final class AsciiViewport extends StackPane {
             return;
         }
 
-        int width = currentResult.getWidth();
-        int height = currentResult.getHeight();
+        try {
+            int width = currentResult.getWidth();
+            int height = currentResult.getHeight();
 
-        double effectiveFontSize = fontSize * zoomFactor;
-        double charWidth = effectiveFontSize * 0.6;
-        double lineHeight = effectiveFontSize * 1.2;
-        double padding = 28.0 * zoomFactor;
+            double effFontSize = fontSize * zoomFactor;
+            double charWidth = effFontSize * 0.6;
+            double lineHeight = effFontSize * 1.2;
+            double padding = Math.max(12.0, 28.0 * zoomFactor);
 
-        this.currentArtWidth = width * charWidth;
-        this.currentArtHeight = height * lineHeight;
-        this.currentPadding = padding;
+            double computedArtWidth = width * charWidth;
+            double computedArtHeight = height * lineHeight;
 
-        this.currentContentWidth = currentArtWidth + (padding * 2);
-        this.currentContentHeight = currentArtHeight + (padding * 2);
-        this.currentSplitX = padding + (splitRatio * currentArtWidth);
+            // Enforce strict upper bound on canvas dimensions to avoid exceeding hardware GPU texture limit (4096px physical texture on 2x Retina)
+            double unscaledW = computedArtWidth + (padding * 2);
+            double unscaledH = computedArtHeight + (padding * 2);
+            if (unscaledW > MAX_CANVAS_DIM || unscaledH > MAX_CANVAS_DIM) {
+                double scaleLimit = Math.min((MAX_CANVAS_DIM - padding * 2) / Math.max(1.0, computedArtWidth),
+                                             (MAX_CANVAS_DIM - padding * 2) / Math.max(1.0, computedArtHeight));
+                effFontSize = Math.max(3.0, effFontSize * scaleLimit);
+                charWidth = effFontSize * 0.6;
+                lineHeight = effFontSize * 1.2;
+                computedArtWidth = width * charWidth;
+                computedArtHeight = height * lineHeight;
+            }
 
-        // Update all canvas layers to exact match
-        sourceCanvas.setWidth(currentContentWidth);
-        sourceCanvas.setHeight(currentContentHeight);
-        asciiCanvas.setWidth(currentContentWidth);
-        asciiCanvas.setHeight(currentContentHeight);
-        overlayCanvas.setWidth(currentContentWidth);
-        overlayCanvas.setHeight(currentContentHeight);
+            this.currentEffectiveFontSize = effFontSize;
+            this.currentArtWidth = computedArtWidth;
+            this.currentArtHeight = computedArtHeight;
+            this.currentPadding = padding;
 
-        renderAsciiLayer();
+            this.currentContentWidth = Math.max(100.0, currentArtWidth + (padding * 2));
+            this.currentContentHeight = Math.max(100.0, currentArtHeight + (padding * 2));
+            this.currentSplitX = padding + (splitRatio * currentArtWidth);
 
-        if (splitViewEnabled) {
-            sourceCanvas.setVisible(true);
-            overlayCanvas.setVisible(true);
-            asciiCanvas.setClip(asciiClip);
-            renderSourceLayer();
-            updateClipsAndOverlay();
-        } else {
-            sourceCanvas.setVisible(false);
-            overlayCanvas.setVisible(false);
-            asciiCanvas.setClip(null);
+            // Update all canvas layers to exact match
+            sourceCanvas.setWidth(currentContentWidth);
+            sourceCanvas.setHeight(currentContentHeight);
+            asciiCanvas.setWidth(currentContentWidth);
+            asciiCanvas.setHeight(currentContentHeight);
+            overlayCanvas.setWidth(currentContentWidth);
+            overlayCanvas.setHeight(currentContentHeight);
+
+            renderAsciiLayer();
+
+            if (splitViewEnabled) {
+                sourceCanvas.setVisible(true);
+                overlayCanvas.setVisible(true);
+                asciiCanvas.setClip(asciiClip);
+                renderSourceLayer();
+                updateClipsAndOverlay();
+            } else {
+                sourceCanvas.setVisible(false);
+                overlayCanvas.setVisible(false);
+                asciiCanvas.setClip(null);
+            }
+        } catch (Throwable t) {
+            t.printStackTrace();
         }
     }
 
@@ -434,9 +553,9 @@ public final class AsciiViewport extends StackPane {
         int height = currentResult.getHeight();
         boolean hasColor = currentResult.hasColor();
 
-        double effectiveFontSize = fontSize * zoomFactor;
-        double charWidth = effectiveFontSize * 0.6;
-        double lineHeight = effectiveFontSize * 1.2;
+        double effFontSize = this.currentEffectiveFontSize;
+        double charWidth = effFontSize * 0.6;
+        double lineHeight = effFontSize * 1.2;
         double tick = 8.0 * zoomFactor;
 
         ThemePalette palette = resolvePalette();
@@ -448,14 +567,14 @@ public final class AsciiViewport extends StackPane {
         drawHudBorders(gc, currentPadding, currentContentWidth, currentContentHeight, tick, palette.wireframeBorderColor, palette.cornerTickColor);
 
         // Fast Glyph Rendering: string table + color deduplication
-        gc.setFont(Font.font("Courier New", effectiveFontSize));
+        gc.setFont(Font.font("Courier New", effFontSize));
         if (!hasColor) {
             gc.setFill(palette.defaultTextColor);
         }
 
         int lastRgb = -1;
         for (int y = 0; y < height; y++) {
-            double baselineY = currentPadding + (y * lineHeight) + (effectiveFontSize * 0.95);
+            double baselineY = currentPadding + (y * lineHeight) + (effFontSize * 0.95);
 
             for (int x = 0; x < width; x++) {
                 char ch = currentResult.getCharacter(x, y);
@@ -473,7 +592,7 @@ public final class AsciiViewport extends StackPane {
                 }
 
                 double posX = currentPadding + (x * charWidth);
-                gc.fillText(ASCII_STRINGS[ch & 0xFF], posX, baselineY);
+                gc.fillText(getGlyphString(ch), posX, baselineY);
             }
         }
 
