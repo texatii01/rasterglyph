@@ -30,7 +30,13 @@ jobs:
         run: chmod +x gradlew
 
       - name: Run Test Suite
-        run: ./gradlew test --info
+        run: |
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            sudo apt-get update && sudo apt-get install -y xvfb
+            xvfb-run --auto-servernum ./gradlew test --info
+          else
+            ./gradlew test --info
+          fi
 
       - name: Compile Classes
         run: ./gradlew classes
